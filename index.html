@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rencana Waypoint</title>
+<meta name="description" content="Perencana grid pemetaan drone — area, overlap, kecepatan, ekspor KML/CSV.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef1f5;
+    --surface:#ffffff;
+    --surface-2:#e3e9ef;
+    --ink:#131b2c;
+    --ink-dim:#57647a;
+    --ink-faint:#8894a6;
+    --line:#c9d2dd;
+    --accent:#d9661f;
+    --accent-ink:#ffffff;
+    --accent2:#1f7a6c;
+    --danger:#b3261e;
+    --grid:rgba(19,27,44,0.08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1420;
+      --surface:#141d2c;
+      --surface-2:#1b2536;
+      --ink:#e9edf3;
+      --ink-dim:#a3aebf;
+      --ink-faint:#6d7890;
+      --line:#2a3547;
+      --accent:#ff9152;
+      --accent-ink:#141d2c;
+      --accent2:#4fd0b8;
+      --danger:#ff6b60;
+      --grid:rgba(232,236,242,0.09);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1420;
+    --surface:#141d2c;
+    --surface-2:#1b2536;
+    --ink:#e9edf3;
+    --ink-dim:#a3aebf;
+    --ink-faint:#6d7890;
+    --line:#2a3547;
+    --accent:#ff9152;
+    --accent-ink:#141d2c;
+    --accent2:#4fd0b8;
+    --danger:#ff6b60;
+    --grid:rgba(232,236,242,0.09);
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    padding-inline:16px;
+  }
+  .mono{font-family:'IBM Plex Mono', ui-monospace, monospace;}
+  h1,h2,h3{text-wrap:balance; margin:0;}
+
+  header.top{
+    max-width:1180px; margin:0 auto; padding-block:20px 16px;
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  header.top .title-block{display:flex; flex-direction:column; gap:2px;}
+  header.top h1{font-size:1.35rem; font-weight:700; letter-spacing:-0.01em;}
+  header.top .sub{font-size:0.82rem; color:var(--ink-dim);}
+  header.top .badge{
+    font-family:'IBM Plex Mono', monospace; font-size:0.7rem; letter-spacing:0.06em;
+    color:var(--accent2); border:1px solid var(--line); background:var(--surface);
+    padding:4px 8px; border-radius:4px; white-space:nowrap;
+  }
+
+  .app-shell{
+    max-width:1180px; margin:0 auto 40px; display:grid;
+    grid-template-columns: 340px 1fr; gap:16px; align-items:start;
+  }
+  @media (max-width:860px){ .app-shell{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    overflow:hidden;
+  }
+  .panel + .panel{margin-top:16px;}
+
+  details.section{border-bottom:1px solid var(--line);}
+  details.section:last-child{border-bottom:none;}
+  details.section > summary{
+    list-style:none; cursor:pointer; padding:13px 16px;
+    display:flex; align-items:center; gap:8px; user-select:none;
+  }
+  details.section > summary::-webkit-details-marker{display:none;}
+  details.section > summary .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.09em;
+    text-transform:uppercase; color:var(--accent); font-weight:600;
+  }
+  details.section > summary .chev{margin-left:auto; color:var(--ink-faint); transition:transform .15s;}
+  details.section[open] > summary .chev{transform:rotate(90deg);}
+  details.section > summary::before{
+    content:""; width:3px; align-self:stretch; background:var(--accent2); border-radius:2px; opacity:.5;
+  }
+  .section-body{padding:2px 16px 16px;}
+
+  .field{display:flex; flex-direction:column; gap:5px; margin-bottom:12px;}
+  .field label{font-size:0.78rem; color:var(--ink-dim); font-weight:500;}
+  .field .hint{font-size:0.71rem; color:var(--ink-faint); margin-top:1px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+  input[type=text], input[type=number], select, textarea{
+    font-family:inherit; font-size:0.86rem; color:var(--ink);
+    background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+    padding:8px 9px; width:100%;
+  }
+  textarea{font-family:'IBM Plex Mono', monospace; font-size:0.78rem; resize:vertical; line-height:1.5;}
+  input:focus, select:focus, textarea:focus, button:focus-visible{
+    outline:2px solid var(--accent); outline-offset:1px;
+  }
+  input[type=range]{width:100%; accent-color:var(--accent);}
+  .checkline{display:flex; align-items:center; gap:7px; font-size:0.8rem; color:var(--ink-dim);}
+  .checkline input{accent-color:var(--accent);}
+
+  .btn{
+    font-family:inherit; font-size:0.82rem; font-weight:600; border-radius:7px;
+    padding:9px 14px; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    text-decoration:none;
+  }
+  .btn:hover{border-color:var(--ink-faint);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+  .btn.primary:hover{filter:brightness(1.05);}
+  .btn.block{width:100%; justify-content:center;}
+  .btn.small{padding:6px 10px; font-size:0.74rem;}
+  .btn-row{display:flex; gap:8px; flex-wrap:wrap;}
+
+  .slider-readout{display:flex; justify-content:space-between; align-items:baseline;}
+  .slider-readout .val{font-family:'IBM Plex Mono', monospace; font-size:0.86rem; color:var(--accent2); font-weight:600;}
+
+  .warn-box{
+    font-size:0.76rem; padding:8px 10px; border-radius:6px; margin-top:10px;
+    border:1px solid var(--line); color:var(--ink-dim); background:var(--surface-2);
+  }
+  .warn-box.bad{border-color:var(--danger); color:var(--danger); background:transparent;}
+
+  /* main / chart */
+  .chart-panel{padding:16px;}
+  .chart-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; gap:8px; flex-wrap:wrap;}
+  .chart-head h2{font-size:0.95rem; font-weight:600;}
+  .chart-head .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:0.72rem; color:var(--ink-dim); align-items:center;}
+  .legend .lg-item{display:flex; align-items:center; gap:5px;}
+  .legend .sw{width:12px; height:12px; border-radius:3px; display:inline-block;}
+
+  .chart-frame{
+    border:1px solid var(--line); border-radius:8px; background:var(--surface-2);
+    overflow:hidden; position:relative;
+  }
+  .chart-frame svg{display:block; width:100%; height:auto;}
+  .empty-note{padding:60px 20px; text-align:center; color:var(--ink-faint); font-size:0.85rem;}
+
+  .stat-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(148px,1fr));
+    gap:1px; background:var(--line); border:1px solid var(--line); border-radius:8px;
+    overflow:hidden; margin-top:14px;
+  }
+  .stat{background:var(--surface); padding:11px 12px;}
+  .stat .k{font-size:0.68rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.05em;}
+  .stat .v{font-family:'IBM Plex Mono', monospace; font-size:1.02rem; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums;}
+  .stat .v small{font-size:0.65rem; font-weight:500; color:var(--ink-dim);}
+
+  .export-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:6px;}
+  @media (max-width:640px){ .export-grid{grid-template-columns:1fr;} }
+  .export-card{border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--surface-2);}
+  .export-card h3{font-size:0.8rem; margin-bottom:8px;}
+  .export-card textarea{height:120px;}
+  .copied-flag{font-size:0.72rem; color:var(--accent2); margin-left:6px; opacity:0; transition:opacity .2s;}
+  .copied-flag.show{opacity:1;}
+
+  footer.note{max-width:1180px; margin:0 auto 30px; font-size:0.74rem; color:var(--ink-faint); line-height:1.6;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="title-block">
+    <h1>Rencana Waypoint</h1>
+    <div class="sub">Perencana grid pemetaan drone — area, overlap, kecepatan, ekspor KML/CSV</div>
+  </div>
+  <span class="badge">AREA CONTOH DIMUAT — GANTI DENGAN MILIK ANDA</span>
+</header>
+
+<div class="app-shell">
+
+  <!-- SIDEBAR CONTROLS -->
+  <div class="panel">
+
+    <details class="section" open>
+      <summary><span class="eyebrow">01 — Area</span><span class="chev">▸</span></summary>
+      <div class="section-body">
+        <div class="field">
+          <label for="coordsInput">Titik batas area (lat,lon per baris)</label>
+          <textarea id="coordsInput" rows="6" spellcheck="false"></textarea>
+          <div class="hint">Urutan mengikuti batas area (searah jarum jam atau sebaliknya). Bisa ditempel langsung dari Google Maps.</div>
+        </div>
+        <div class="btn-row">
+          <label class="btn small" for="fileInput" style="cursor:pointer;">Impor file (KML/KMZ/GeoJSON)</label>
+          <input type="file" id="fileInput" accept=".kml,.kmz,.geojson,.json" hidden>
+          <button class="btn small" id="btnExample">Muat contoh</button>
+          <button class="btn small" id="btnClear">Kosongkan</button>
+        </div>
+        <div class="hint" id="fileStatus" style="margin-top:8px;"></div>
+      </div>
+    </details>
+
+    <details class="section" open>
+      <summary><span class="eyebrow">02 — Kamera</span><span class="chev">▸</span></summary>
+      <div class="section-body">
+        <div class="field">
+          <label for="cameraPreset">Preset kamera</label>
+          <select id="cameraPreset">
+            <option value="air3-wide-12">DJI Air 3 — Wide 24mm, 12 MP</option>
+            <option value="air3-wide-48">DJI Air 3 — Wide 24mm, 48 MP</option>
+            <option value="air3-tele-12">DJI Air 3 — Tele 70mm, 12 MP</option>
+            <option value="mavic3e">DJI Mavic 3E — 24mm</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <div class="hint">Nilai berdasarkan spesifikasi umum yang dipublikasikan. Jika berbeda dari unit Anda, pilih Custom.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="focalLength">Focal length eq. (mm)</label>
+            <input type="number" id="focalLength" step="0.1">
+          </div>
+          <div class="field">
+            <label for="sensorWidth">Lebar sensor eq. (mm)</label>
+            <input type="number" id="sensorWidth" step="0.1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="imgWidth">Lebar gambar (px)</label>
+            <input type="number" id="imgWidth" step="1">
+          </div>
+          <div class="field">
+            <label for="imgHeight">Tinggi gambar (px)</label>
+            <input type="number" id="imgHeight" step="1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="interval">Interval foto (detik)</label>
+            <input type="number" id="interval" step="0.1" value="2">
+          </div>
+          <div class="field">
+            <label for="shutter">Rana / shutter (1/x detik)</label>
+            <input type="number" id="shutter" step="1" value="1000">
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="section" open>
+      <summary><span class="eyebrow">03 — Parameter Terbang</span><span class="chev">▸</span></summary>
+      <div class="section-body">
+        <div class="field">
+          <label for="altitude">Ketinggian AGL (m)</label>
+          <input type="number" id="altitude" value="120" step="1">
+          <div class="hint">Samakan dengan batas ketinggian pada NOTAM Anda.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="frontOverlap">Overlap depan (%)</label>
+            <input type="number" id="frontOverlap" value="75" min="10" max="95" step="1">
+          </div>
+          <div class="field">
+            <label for="sideOverlap">Overlap samping (%)</label>
+            <input type="number" id="sideOverlap" value="65" min="10" max="95" step="1">
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="checkline"><input type="checkbox" id="angleAuto" checked><label for="angleAuto">Arah jalur otomatis (paling efisien)</label></div>
+        </div>
+        <div class="field" id="angleManualWrap" style="display:none;">
+          <div class="slider-readout"><label for="angleSlider">Arah jalur (° dari utara)</label><span class="val" id="angleVal">0°</span></div>
+          <input type="range" id="angleSlider" min="0" max="179" value="0" step="1">
+        </div>
+
+        <div class="field">
+          <div class="checkline"><input type="checkbox" id="speedAuto" checked><label for="speedAuto">Kecepatan otomatis (aman)</label></div>
+        </div>
+        <div class="field" id="speedManualWrap" style="display:none;">
+          <div class="slider-readout"><label for="speedSlider">Kecepatan (m/s)</label><span class="val" id="speedVal">8.0</span></div>
+          <input type="range" id="speedSlider" min="1" max="18" value="8" step="0.5">
+        </div>
+        <div class="warn-box" id="speedWarn" style="display:none;"></div>
+      </div>
+    </details>
+
+    <div class="section-body" style="padding-top:14px;">
+      <button class="btn primary block" id="btnGenerate">Buat rencana waypoint</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div>
+    <div class="panel chart-panel">
+      <div class="chart-head">
+        <h2>Peta jalur (skala lokal, tanpa citra dasar)</h2>
+        <div class="legend">
+          <span class="lg-item"><span class="sw" style="background:var(--accent2); opacity:.35;"></span>Batas area</span>
+          <span class="lg-item"><span class="sw" style="background:var(--accent);"></span>Jalur terbang</span>
+          <span class="lg-item"><span class="sw" style="background:var(--ink);"></span>Waypoint</span>
+        </div>
+      </div>
+      <div class="chart-frame" id="chartFrame">
+        <div class="empty-note">Masukkan minimal 3 titik koordinat, lalu klik "Buat rencana waypoint".</div>
+      </div>
+
+      <div class="stat-grid" id="statGrid" style="display:none;"></div>
+    </div>
+
+    <div class="panel" style="padding:16px; margin-top:16px; display:none;" id="exportPanel">
+      <h2 style="font-size:0.95rem; margin-bottom:10px;">Ekspor</h2>
+      <div class="hint" style="margin-bottom:10px;">
+        Salin teks di bawah atau langsung unduh sebagai file untuk dipindahkan ke remote/aplikasi drone Anda.
+      </div>
+      <div class="export-grid">
+        <div class="export-card">
+          <h3>KML (waypoint + jalur)</h3>
+          <textarea id="kmlOut" readonly spellcheck="false"></textarea>
+          <div class="btn-row" style="margin-top:8px;">
+            <button class="btn small" id="copyKml">Salin KML</button>
+            <button class="btn small" id="downloadKml">Unduh .kml</button>
+            <span class="copied-flag" id="kmlFlag">Tersalin</span>
+          </div>
+        </div>
+        <div class="export-card">
+          <h3>CSV (daftar titik)</h3>
+          <textarea id="csvOut" readonly spellcheck="false"></textarea>
+          <div class="btn-row" style="margin-top:8px;">
+            <button class="btn small" id="copyCsv">Salin CSV</button>
+            <button class="btn small" id="downloadCsv">Unduh .csv</button>
+            <span class="copied-flag" id="csvFlag">Tersalin</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="note">
+  Perkiraan GSD, kecepatan, dan waktu terbang bersifat estimasi berdasarkan parameter yang dimasukkan — verifikasi terhadap manual drone dan kondisi lapangan (angin, baterai) sebelum terbang. Algoritma grid mengambil rentang terluar area pada tiap baris jalur, sehingga cocok untuk area sederhana/cembung; untuk area yang sangat berlekuk, periksa visual jalur sebelum digunakan. Titik yang dihasilkan adalah titik belok tiap jalur — foto diambil otomatis di sepanjang jalur sesuai interval kamera. Semua perhitungan berjalan di browser; tidak ada data yang dikirim ke server mana pun.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var CAMERA_PRESETS = {
+    "air3-wide-12": {focal:24, sensor:36, w:4032, h:3024, interval:2, shutter:1000},
+    "air3-wide-48": {focal:24, sensor:36, w:8064, h:6048, interval:3, shutter:1000},
+    "air3-tele-12": {focal:70, sensor:36, w:4032, h:3024, interval:2, shutter:800},
+    "mavic3e":       {focal:24, sensor:36, w:5280, h:3956, interval:2, shutter:1000},
+    "custom":        {focal:24, sensor:36, w:4032, h:3024, interval:2, shutter:1000}
+  };
+
+  var EXAMPLE_COORDS = [
+    [-4.5310,136.8930],
+    [-4.5310,136.8990],
+    [-4.5355,136.8990],
+    [-4.5355,136.8930]
+  ];
+
+  var els = {};
+  ["coordsInput","fileInput","fileStatus","btnExample","btnClear",
+   "cameraPreset","focalLength","sensorWidth","imgWidth","imgHeight","interval","shutter",
+   "altitude","frontOverlap","sideOverlap",
+   "angleAuto","angleManualWrap","angleSlider","angleVal",
+   "speedAuto","speedManualWrap","speedSlider","speedVal","speedWarn",
+   "btnGenerate","chartFrame","statGrid","exportPanel",
+   "kmlOut","csvOut","copyKml","copyCsv","kmlFlag","csvFlag","downloadKml","downloadCsv"
+  ].forEach(function(id){ els[id]=document.getElementById(id); });
+
+  var lastPlan = null;
+
+  // ---------- persistence (per-viewer convenience only) ----------
+  function loadPrefs(){
+    try{
+      var raw = localStorage.getItem('wp_prefs_v1');
+      if(!raw) return;
+      var p = JSON.parse(raw);
+      if(p.camera) els.cameraPreset.value = p.camera;
+      if(p.altitude) els.altitude.value = p.altitude;
+      if(p.front) els.frontOverlap.value = p.front;
+      if(p.side) els.sideOverlap.value = p.side;
+    }catch(e){}
+  }
+  function savePrefs(){
+    try{
+      localStorage.setItem('wp_prefs_v1', JSON.stringify({
+        camera: els.cameraPreset.value,
+        altitude: els.altitude.value,
+        front: els.frontOverlap.value,
+        side: els.sideOverlap.value
+      }));
+    }catch(e){}
+  }
+
+  // ---------- camera preset ----------
+  function applyPreset(key){
+    var p = CAMERA_PRESETS[key] || CAMERA_PRESETS.custom;
+    els.focalLength.value = p.focal;
+    els.sensorWidth.value = p.sensor;
+    els.imgWidth.value = p.w;
+    els.imgHeight.value = p.h;
+    els.interval.value = p.interval;
+    els.shutter.value = p.shutter;
+  }
+  els.cameraPreset.addEventListener('change', function(){ applyPreset(this.value); });
+
+  // ---------- coord parsing ----------
+  function coordsToText(pts){
+    return pts.map(function(p){ return p.lat.toFixed(6)+","+p.lon.toFixed(6); }).join("\n");
+  }
+  function parseTextCoords(text){
+    var pts = [];
+    text.split(/\n/).forEach(function(line){
+      line = line.trim();
+      if(!line || line[0]==='#') return;
+      var parts = line.split(/[,;\s]+/).filter(Boolean);
+      if(parts.length<2) return;
+      var a = parseFloat(parts[0]), b = parseFloat(parts[1]);
+      if(isNaN(a) || isNaN(b)) return;
+      var lat, lon;
+      if(Math.abs(a) > 90){ lon=a; lat=b; } else { lat=a; lon=b; }
+      pts.push({lat:lat, lon:lon});
+    });
+    return dedupeClosingPoint(pts);
+  }
+  function dedupeClosingPoint(pts){
+    if(pts.length>2){
+      var f=pts[0], l=pts[pts.length-1];
+      if(Math.abs(f.lat-l.lat)<1e-7 && Math.abs(f.lon-l.lon)<1e-7) pts = pts.slice(0,-1);
+    }
+    return pts;
+  }
+  function parseKmlText(text){
+    var dom = new DOMParser().parseFromString(text, "text/xml");
+    var coordNodes = dom.getElementsByTagName("coordinates");
+    if(!coordNodes.length) return [];
+    var best = null, bestLen = 0;
+    for(var i=0;i<coordNodes.length;i++){
+      var tuples = coordNodes[i].textContent.trim().split(/\s+/).filter(Boolean);
+      if(tuples.length > bestLen){ bestLen = tuples.length; best = tuples; }
+    }
+    if(!best) return [];
+    var pts = best.map(function(t){
+      var seg = t.split(",");
+      return {lon: parseFloat(seg[0]), lat: parseFloat(seg[1])};
+    }).filter(function(p){ return !isNaN(p.lat) && !isNaN(p.lon); });
+    return dedupeClosingPoint(pts);
+  }
+  function parseGeoJsonText(text){
+    var obj = JSON.parse(text);
+    var ring = null;
+    function fromGeom(g){
+      if(!g) return null;
+      if(g.type==="Polygon") return g.coordinates[0];
+      if(g.type==="MultiPolygon") return g.coordinates[0][0];
+      return null;
+    }
+    if(obj.type==="FeatureCollection"){
+      for(var i=0;i<obj.features.length;i++){
+        ring = fromGeom(obj.features[i].geometry);
+        if(ring) break;
+      }
+    } else if(obj.type==="Feature"){
+      ring = fromGeom(obj.geometry);
+    } else {
+      ring = fromGeom(obj);
+    }
+    if(!ring) return [];
+    var pts = ring.map(function(c){ return {lon:c[0], lat:c[1]}; });
+    return dedupeClosingPoint(pts);
+  }
+
+  els.btnExample.addEventListener('click', function(){
+    els.coordsInput.value = EXAMPLE_COORDS.map(function(c){return c[0].toFixed(6)+","+c[1].toFixed(6);}).join("\n");
+    els.fileStatus.textContent = "Area contoh dimuat.";
+  });
+  els.btnClear.addEventListener('click', function(){
+    els.coordsInput.value = "";
+    els.fileStatus.textContent = "";
+  });
+
+  els.fileInput.addEventListener('change', function(){
+    var f = this.files[0];
+    if(!f) return;
+    var name = f.name.toLowerCase();
+    els.fileStatus.textContent = "Membaca "+f.name+"…";
+    if(name.endsWith(".kmz")){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        JSZip.loadAsync(e.target.result).then(function(zip){
+          var kmlFile = null;
+          zip.forEach(function(path, entry){ if(!kmlFile && path.toLowerCase().endsWith(".kml")) kmlFile = entry; });
+          if(!kmlFile){ els.fileStatus.textContent = "Tidak menemukan file .kml di dalam KMZ."; return; }
+          return kmlFile.async("text").then(function(text){
+            var pts = parseKmlText(text);
+            finishImport(pts, f.name);
+          });
+        }).catch(function(err){ els.fileStatus.textContent = "Gagal membaca KMZ: "+err.message; });
+      };
+      reader.readAsArrayBuffer(f);
+    } else {
+      var reader2 = new FileReader();
+      reader2.onload = function(e){
+        var text = e.target.result;
+        var pts = [];
+        try{
+          if(name.endsWith(".geojson") || name.endsWith(".json")) pts = parseGeoJsonText(text);
+          else pts = parseKmlText(text);
+        }catch(err){ els.fileStatus.textContent = "Gagal membaca file: "+err.message; return; }
+        finishImport(pts, f.name);
+      };
+      reader2.readAsText(f);
+    }
+  });
+  function finishImport(pts, filename){
+    if(!pts || pts.length<3){ els.fileStatus.textContent = "Tidak ditemukan poligon yang valid di "+filename+"."; return; }
+    els.coordsInput.value = coordsToText(pts);
+    els.fileStatus.textContent = pts.length+" titik dimuat dari "+filename+".";
+  }
+
+  // ---------- geometry helpers ----------
+  var M_PER_DEG_LAT = 110540;
+  function mPerDegLon(latDeg){ return 111320*Math.cos(latDeg*Math.PI/180); }
+
+  function toLocal(pts){
+    var lat0 = pts.reduce(function(s,p){return s+p.lat;},0)/pts.length;
+    var lon0 = pts.reduce(function(s,p){return s+p.lon;},0)/pts.length;
+    var mLon = mPerDegLon(lat0);
+    var local = pts.map(function(p){
+      return { x:(p.lon-lon0)*mLon, y:(p.lat-lat0)*M_PER_DEG_LAT };
+    });
+    return {local:local, lat0:lat0, lon0:lon0, mLon:mLon};
+  }
+  function toLatLon(pt, lat0, lon0, mLon){
+    return { lat: lat0 + pt.y/M_PER_DEG_LAT, lon: lon0 + pt.x/mLon };
+  }
+  function rotate(p, angleDeg){
+    var a = angleDeg*Math.PI/180;
+    var c = Math.cos(a), s = Math.sin(a);
+    return { x: p.x*c - p.y*s, y: p.x*s + p.y*c };
+  }
+  function polygonArea(pts){
+    var a=0;
+    for(var i=0;i<pts.length;i++){
+      var p1=pts[i], p2=pts[(i+1)%pts.length];
+      a += p1.x*p2.y - p2.x*p1.y;
+    }
+    return Math.abs(a)/2;
+  }
+  function lineIntersectionsAtY(rpts, y){
+    var xs = [];
+    var n = rpts.length;
+    for(var i=0;i<n;i++){
+      var p1 = rpts[i], p2 = rpts[(i+1)%n];
+      var y1=p1.y, y2=p2.y;
+      if((y1<=y && y2>y) || (y2<=y && y1>y)){
+        var t = (y-y1)/(y2-y1);
+        xs.push(p1.x + t*(p2.x-p1.x));
+      }
+    }
+    xs.sort(function(a,b){return a-b;});
+    return xs;
+  }
+  function niceNumber(x){
+    if(x<=0) return 1;
+    var exp = Math.floor(Math.log10(x));
+    var f = x/Math.pow(10,exp);
+    var nf;
+    if(f<1.5) nf=1; else if(f<3.5) nf=2; else if(f<7.5) nf=5; else nf=10;
+    return nf*Math.pow(10,exp);
+  }
+
+  // ---------- UI wiring for angle / speed toggles ----------
+  els.angleAuto.addEventListener('change', function(){
+    els.angleManualWrap.style.display = this.checked ? 'none' : 'block';
+  });
+  els.angleSlider.addEventListener('input', function(){ els.angleVal.textContent = this.value+"°"; });
+  els.speedAuto.addEventListener('change', function(){
+    els.speedManualWrap.style.display = this.checked ? 'none' : 'block';
+  });
+  els.speedSlider.addEventListener('input', function(){ els.speedVal.textContent = parseFloat(this.value).toFixed(1); });
+
+  // ---------- main generate ----------
+  els.btnGenerate.addEventListener('click', generate);
+
+  function computeCameraStats(){
+    var focal = parseFloat(els.focalLength.value);
+    var sensorW = parseFloat(els.sensorWidth.value);
+    var imgW = parseFloat(els.imgWidth.value);
+    var imgH = parseFloat(els.imgHeight.value);
+    var alt = parseFloat(els.altitude.value);
+    var front = Math.min(95, Math.max(0, parseFloat(els.frontOverlap.value)));
+    var side = Math.min(95, Math.max(0, parseFloat(els.sideOverlap.value)));
+    var interval = parseFloat(els.interval.value);
+    var shutterDen = parseFloat(els.shutter.value);
+    var shutterS = shutterDen>0 ? 1/shutterDen : 0.001;
+
+    var sensorH = sensorW * (imgH/imgW);
+    var gsd_cm = (sensorW*alt*100)/(focal*imgW);
+    var footprintCross = sensorW*alt/focal;   // meters, perpendicular to flight (line spacing basis)
+    var footprintAlong = sensorH*alt/focal;   // meters, along flight (photo spacing basis)
+    var lineSpacing = footprintCross*(1-side/100);
+    var photoSpacing = footprintAlong*(1-front/100);
+    var maxSpeedInterval = interval>0 ? photoSpacing/interval : Infinity;
+    var allowedBlur_m = gsd_cm/100; // 1px blur budget
+    var maxSpeedBlur = shutterS>0 ? allowedBlur_m/shutterS : Infinity;
+
+    return {focal:focal, sensorW:sensorW, sensorH:sensorH, imgW:imgW, imgH:imgH, alt:alt,
+      front:front, side:side, interval:interval, shutterS:shutterS,
+      gsd_cm:gsd_cm, footprintCross:footprintCross, footprintAlong:footprintAlong,
+      lineSpacing:Math.max(lineSpacing,0.5), photoSpacing:Math.max(photoSpacing,0.5),
+      maxSpeedInterval:maxSpeedInterval, maxSpeedBlur:maxSpeedBlur};
+  }
+
+  function buildGrid(local, cam, angleDeg){
+    var lineSpacing = cam.lineSpacing;
+    var rpts = local.map(function(p){ return rotate(p, -angleDeg); });
+    var minY = Math.min.apply(null, rpts.map(function(p){return p.y;}));
+    var maxY = Math.max.apply(null, rpts.map(function(p){return p.y;}));
+    var n = Math.max(1, Math.ceil((maxY-minY)/lineSpacing || 1));
+    var effSpacing = (maxY-minY)/n || lineSpacing;
+    var lines = [];
+    for(var i=0;i<=n;i++){
+      var y = minY + i*effSpacing;
+      var xs = lineIntersectionsAtY(rpts, y);
+      if(xs.length<2) continue;
+      var x0 = xs[0], x1 = xs[xs.length-1];
+      if(x1-x0 < 0.5) continue;
+      lines.push({y:y, x0:x0, x1:x1});
+    }
+    // build zig-zag waypoints (rotated frame)
+    var wps = [];
+    lines.forEach(function(line, idx){
+      if(idx%2===0) { wps.push({x:line.x0,y:line.y}); wps.push({x:line.x1,y:line.y}); }
+      else { wps.push({x:line.x1,y:line.y}); wps.push({x:line.x0,y:line.y}); }
+    });
+    // rotate back
+    var wpsLocal = wps.map(function(p){ return rotate(p, angleDeg); });
+    var inlineLen = lines.reduce(function(s,l){return s+(l.x1-l.x0);},0);
+    var transitLen = 0;
+    for(var k=0;k<wps.length-1;k+=2){
+      if(k+2<wps.length){
+        var a = wps[k+1], b = wps[k+2];
+        transitLen += Math.hypot(b.x-a.x, b.y-a.y);
+      }
+    }
+    return {wpsLocal:wpsLocal, numLines:lines.length, inlineLen:inlineLen, transitLen:transitLen, effSpacing:effSpacing};
+  }
+
+  function autoAngle(local, cam){
+    var best = null, bestScore = Infinity;
+    for(var a=0; a<180; a+=5){
+      var g = buildGrid(local, cam, a);
+      var score = g.inlineLen + g.transitLen;
+      if(g.numLines>0 && score < bestScore){ bestScore = score; best = a; }
+    }
+    return best===null ? 0 : best;
+  }
+
+  function generate(){
+    var pts = parseTextCoords(els.coordsInput.value);
+    if(pts.length<3){
+      els.chartFrame.innerHTML = '<div class="empty-note">Area belum valid — masukkan minimal 3 titik koordinat.</div>';
+      els.statGrid.style.display='none';
+      els.exportPanel.style.display='none';
+      return;
+    }
+    savePrefs();
+    var cam = computeCameraStats();
+    var proj = toLocal(pts);
+    var local = proj.local;
+
+    var angleDeg;
+    if(els.angleAuto.checked){ angleDeg = autoAngle(local, cam); }
+    else { angleDeg = parseFloat(els.angleSlider.value); }
+
+    var grid = buildGrid(local, cam, angleDeg);
+    if(grid.wpsLocal.length===0){
+      els.chartFrame.innerHTML = '<div class="empty-note">Tidak bisa membuat jalur dari area ini — periksa urutan titik atau perbesar area.</div>';
+      els.statGrid.style.display='none';
+      els.exportPanel.style.display='none';
+      return;
+    }
+
+    var recSpeed = Math.min(cam.maxSpeedInterval, cam.maxSpeedBlur) * 0.9;
+    recSpeed = Math.max(1, Math.min(recSpeed, 18));
+    var speed;
+    if(els.speedAuto.checked){
+      speed = recSpeed;
+    } else {
+      speed = parseFloat(els.speedSlider.value);
+    }
+
+    var overLimit = speed > cam.maxSpeedInterval + 0.05 || speed > cam.maxSpeedBlur + 0.05;
+    if(overLimit){
+      els.speedWarn.style.display='block';
+      els.speedWarn.className = 'warn-box bad';
+      els.speedWarn.textContent = 'Kecepatan '+speed.toFixed(1)+' m/s melebihi batas aman ('+Math.min(cam.maxSpeedInterval,cam.maxSpeedBlur).toFixed(1)+' m/s) — foto berisiko berjarak terlalu renggang atau buram.';
+    } else {
+      els.speedWarn.style.display='block';
+      els.speedWarn.className = 'warn-box';
+      els.speedWarn.textContent = 'Batas kecepatan: '+cam.maxSpeedInterval.toFixed(1)+' m/s (interval foto), '+cam.maxSpeedBlur.toFixed(1)+' m/s (blur). Kecepatan digunakan: '+speed.toFixed(1)+' m/s.';
+    }
+
+    var totalLen = grid.inlineLen + grid.transitLen;
+    var numTurns = Math.max(0, grid.numLines-1);
+    var flightTimeMin = (totalLen/speed + numTurns*3)/60;
+    var numPhotos = Math.round(grid.inlineLen/cam.photoSpacing) + grid.numLines;
+    var areaHa = polygonArea(local)/10000;
+
+    var wpsLatLon = grid.wpsLocal.map(function(p){ return toLatLon(p, proj.lat0, proj.lon0, proj.mLon); });
+
+    lastPlan = {
+      pts: pts, local: local, proj: proj, cam: cam, angleDeg: angleDeg, grid: grid,
+      speed: speed, wpsLatLon: wpsLatLon, totalLen: totalLen, flightTimeMin: flightTimeMin,
+      numPhotos: numPhotos, areaHa: areaHa
+    };
+
+    renderChart(local, grid, angleDeg);
+    renderStats(lastPlan);
+    renderExports(lastPlan);
+  }
+
+  // ---------- chart ----------
+  function renderChart(local, grid, angleDeg){
+    var allX = local.map(function(p){return p.x;}).concat(grid.wpsLocal.map(function(p){return p.x;}));
+    var allY = local.map(function(p){return p.y;}).concat(grid.wpsLocal.map(function(p){return p.y;}));
+    var minX=Math.min.apply(null,allX), maxX=Math.max.apply(null,allX);
+    var minY=Math.min.apply(null,allY), maxY=Math.max.apply(null,allY);
+    var w = maxX-minX, h = maxY-minY;
+    var pad = Math.max(w,h,10)*0.14;
+    var vbW = w+2*pad, vbH = h+2*pad;
+    var minXv = minX-pad, maxYv = maxY+pad;
+
+    function sx(x){ return x-minXv; }
+    function sy(y){ return maxYv-y; }
+
+    var strokeW = Math.max(vbW,vbH)*0.0045;
+    var dotR = Math.max(vbW,vbH)*0.008;
+    var fontSize = Math.max(vbW,vbH)*0.028;
+
+    // grid lines (nice meter spacing)
+    var gridStep = niceNumber(Math.max(vbW,vbH)/6);
+    var gridLines = "";
+    var gx0 = Math.ceil(minXv/gridStep)*gridStep;
+    for(var gx=gx0; gx<minXv+vbW; gx+=gridStep){
+      gridLines += '<line x1="'+sx(gx)+'" y1="0" x2="'+sx(gx)+'" y2="'+vbH+'" stroke="var(--grid)" stroke-width="'+(strokeW*0.4)+'"/>';
+    }
+    var gy0 = Math.ceil((maxYv-vbH)/gridStep)*gridStep;
+    for(var gy=gy0; gy<maxYv; gy+=gridStep){
+      gridLines += '<line x1="0" y1="'+sy(gy)+'" x2="'+vbW+'" y2="'+sy(gy)+'" stroke="var(--grid)" stroke-width="'+(strokeW*0.4)+'"/>';
+    }
+
+    var polyPts = local.map(function(p){ return sx(p.x)+","+sy(p.y); }).join(" ");
+    var pathPts = grid.wpsLocal.map(function(p){ return sx(p.x)+","+sy(p.y); }).join(" ");
+    var dots = grid.wpsLocal.map(function(p,i){
+      var label = (i===0 || i===grid.wpsLocal.length-1) ? ('<text x="'+(sx(p.x)+dotR*1.6)+'" y="'+(sy(p.y)+fontSize*0.35)+'" font-size="'+fontSize+'" fill="var(--ink-dim)" font-family="IBM Plex Mono, monospace">'+(i===0?'MULAI':'SELESAI')+'</text>') : '';
+      var fill = (i===0) ? 'var(--accent2)' : (i===grid.wpsLocal.length-1 ? 'var(--danger)' : 'var(--ink)');
+      return '<circle cx="'+sx(p.x)+'" cy="'+sy(p.y)+'" r="'+dotR+'" fill="'+fill+'"/>'+label;
+    }).join("");
+
+    var scaleLen = niceNumber(vbW*0.25);
+    var sbX = vbW*0.04, sbY = vbH*0.94;
+    var scaleBar = '<g font-family="IBM Plex Mono, monospace">'+
+      '<line x1="'+sbX+'" y1="'+sbY+'" x2="'+(sbX+scaleLen)+'" y2="'+sbY+'" stroke="var(--ink-dim)" stroke-width="'+strokeW+'"/>'+
+      '<line x1="'+sbX+'" y1="'+(sbY-fontSize*0.3)+'" x2="'+sbX+'" y2="'+(sbY+fontSize*0.3)+'" stroke="var(--ink-dim)" stroke-width="'+strokeW+'"/>'+
+      '<line x1="'+(sbX+scaleLen)+'" y1="'+(sbY-fontSize*0.3)+'" x2="'+(sbX+scaleLen)+'" y2="'+(sbY+fontSize*0.3)+'" stroke="var(--ink-dim)" stroke-width="'+strokeW+'"/>'+
+      '<text x="'+sbX+'" y="'+(sbY-fontSize*0.5)+'" font-size="'+fontSize+'" fill="var(--ink-dim)">'+scaleLen+' m</text>'+
+      '</g>';
+
+    var naX = vbW*0.93, naY = vbH*0.10, naLen = Math.max(vbW,vbH)*0.06;
+    var northArrow = '<g stroke="var(--ink-dim)" stroke-width="'+strokeW+'" fill="var(--ink-dim)" font-family="IBM Plex Mono, monospace">'+
+      '<line x1="'+naX+'" y1="'+(naY+naLen)+'" x2="'+naX+'" y2="'+naY+'"/>'+
+      '<polygon points="'+naX+','+(naY-naLen*0.35)+' '+(naX-naLen*0.28)+','+(naY+naLen*0.15)+' '+(naX+naLen*0.28)+','+(naY+naLen*0.15)+'"/>'+
+      '<text x="'+naX+'" y="'+(naY+naLen+fontSize*1.1)+'" font-size="'+fontSize+'" text-anchor="middle" fill="var(--ink-dim)">U</text>'+
+      '</g>';
+
+    var svg = '<svg viewBox="0 0 '+vbW+' '+vbH+'" xmlns="http://www.w3.org/2000/svg">'+
+      gridLines+
+      '<polygon points="'+polyPts+'" fill="var(--accent2)" fill-opacity="0.16" stroke="var(--accent2)" stroke-width="'+strokeW+'"/>'+
+      '<polyline points="'+pathPts+'" fill="none" stroke="var(--accent)" stroke-width="'+strokeW+'" stroke-linejoin="round" stroke-linecap="round"/>'+
+      dots+
+      scaleBar+
+      northArrow+
+      '</svg>';
+
+    els.chartFrame.innerHTML = svg;
+  }
+
+  // ---------- stats ----------
+  function fmt(n, d){ return n.toLocaleString('id-ID', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+  function renderStats(plan){
+    var c = plan.cam;
+    var items = [
+      ["Luas area", fmt(plan.areaHa,2)+" ha"],
+      ["GSD", fmt(c.gsd_cm,2)+" cm/px"],
+      ["Footprint", fmt(c.footprintCross,0)+" × "+fmt(c.footprintAlong,0)+" m"],
+      ["Jarak antar jalur", fmt(c.lineSpacing,1)+" m"],
+      ["Jarak antar foto", fmt(c.photoSpacing,1)+" m"],
+      ["Arah jalur", fmt(plan.angleDeg,0)+"° dr utara"],
+      ["Jumlah jalur", plan.grid.numLines],
+      ["Jumlah waypoint", plan.wpsLatLon.length],
+      ["Perkiraan jumlah foto", "~"+plan.numPhotos],
+      ["Panjang lintasan", fmt(plan.totalLen/1000,2)+" km"],
+      ["Perkiraan waktu terbang", fmt(plan.flightTimeMin,1)+" menit"],
+      ["Kecepatan digunakan", fmt(plan.speed,1)+" m/s"]
+    ];
+    els.statGrid.innerHTML = items.map(function(it){
+      return '<div class="stat"><div class="k">'+it[0]+'</div><div class="v">'+it[1]+'</div></div>';
+    }).join("");
+    els.statGrid.style.display = 'grid';
+  }
+
+  // ---------- export ----------
+  function toKmlColor(hex){
+    hex = hex.replace('#','');
+    var r=hex.substr(0,2), g=hex.substr(2,2), b=hex.substr(4,2);
+    return "ff"+b+g+r;
+  }
+  function renderExports(plan){
+    var alt = plan.cam.alt;
+    var placemarks = plan.wpsLatLon.map(function(p,i){
+      return '<Placemark><name>WP'+String(i+1).padStart(2,'0')+'</name>'+
+        '<Point><altitudeMode>relativeToGround</altitudeMode><coordinates>'+p.lon.toFixed(7)+','+p.lat.toFixed(7)+','+alt+'</coordinates></Point></Placemark>';
+    }).join("");
+    var lineCoords = plan.wpsLatLon.map(function(p){ return p.lon.toFixed(7)+','+p.lat.toFixed(7)+','+alt; }).join(" ");
+    var kml = '<?xml version="1.0" encoding="UTF-8"?>\n'+
+      '<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Rencana Waypoint</name>\n'+
+      '<Style id="flightPath"><LineStyle><color>'+toKmlColor('d9661f')+'</color><width>3</width></LineStyle></Style>\n'+
+      '<Placemark><name>Jalur Terbang</name><styleUrl>#flightPath</styleUrl>'+
+      '<LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>'+lineCoords+'</coordinates></LineString></Placemark>\n'+
+      placemarks+
+      '\n</Document></kml>';
+
+    var csvRows = ["seq,lat,lon,altitude_m"];
+    plan.wpsLatLon.forEach(function(p,i){
+      csvRows.push((i+1)+","+p.lat.toFixed(7)+","+p.lon.toFixed(7)+","+alt);
+    });
+    var csv = csvRows.join("\n");
+
+    els.kmlOut.value = kml;
+    els.csvOut.value = csv;
+    els.exportPanel.style.display = 'block';
+  }
+
+  function copyText(text, flagEl){
+    function done(){ flagEl.classList.add('show'); setTimeout(function(){flagEl.classList.remove('show');}, 1500); }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){ fallbackCopy(text); done(); });
+    } else {
+      fallbackCopy(text); done();
+    }
+  }
+  function fallbackCopy(text){
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+  }
+  function downloadText(text, filename, mime){
+    var blob = new Blob([text], {type: mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  els.copyKml.addEventListener('click', function(){ copyText(els.kmlOut.value, els.kmlFlag); });
+  els.copyCsv.addEventListener('click', function(){ copyText(els.csvOut.value, els.csvFlag); });
+  els.downloadKml.addEventListener('click', function(){ downloadText(els.kmlOut.value, 'rencana-waypoint.kml', 'application/vnd.google-earth.kml+xml'); });
+  els.downloadCsv.addEventListener('click', function(){ downloadText(els.csvOut.value, 'rencana-waypoint.csv', 'text/csv'); });
+
+  // ---------- init ----------
+  loadPrefs();
+  applyPreset(els.cameraPreset.value);
+  els.coordsInput.value = EXAMPLE_COORDS.map(function(c){return c[0].toFixed(6)+","+c[1].toFixed(6);}).join("\n");
+  generate();
+
+})();
+</script>
+</body>
+</html>
